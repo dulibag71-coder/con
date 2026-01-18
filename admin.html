@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CONCERT ADMIN | METAVERSE OS</title>
+    <link rel="stylesheet" href="client/css/app.css">
+    <style>
+        body {
+            align-items: flex-start;
+            padding-top: 50px;
+        }
+
+        .container {
+            max-width: 900px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th,
+        td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        th {
+            background: rgba(0, 212, 255, 0.1);
+            color: var(--primary);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .song-card {
+            background: var(--glass-bg);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px dashed var(--primary);
+        }
+
+        select {
+            background: #1a1a24;
+            color: white;
+            border: 1px solid var(--glass-border);
+            padding: 10px;
+            border-radius: 6px;
+            font-family: inherit;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container glass-panel">
+        <h1>ADMIN CONTROL</h1>
+        <p style="color: var(--text-dim); margin-bottom: 2rem;">시스템 승인 및 공연 관리 패널</p>
+
+        <div id="login-section">
+            <div class="input-group">
+                <label>ROOT PASSWORD</label>
+                <input type="password" id="admin-pw" placeholder="••••••••">
+            </div>
+            <button onclick="Admin.loadPendingList()">ACCESS SYSTEM</button>
+        </div>
+
+        <div id="admin-section" class="hidden">
+            <div class="song-card">
+                <h3 style="color: var(--primary); margin-bottom: 15px;">STAGE BROADCAST</h3>
+                <label>공연 곡 선택</label>
+                <select id="song-select">
+                    <option value="assets/audio/song1.mp3">메인 곡 (The Future)</option>
+                    <option value="assets/audio/song2.mp3">서브 곡 1 (Cyber City)</option>
+                    <option value="assets/audio/song3.mp3">서브 곡 2 (Neon Dreams)</option>
+                </select>
+                <button onclick="Admin.startConcert()"
+                    style="background: linear-gradient(90deg, var(--danger), #ff8800);">공연 시작 신호 발송</button>
+            </div>
+
+            <h3 style="margin-top: 2rem;">PENDING REQUESTS</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>USER</th>
+                        <th>DEPOSITOR</th>
+                        <th>TIME</th>
+                        <th>ACTION</th>
+                    </tr>
+                </thead>
+                <tbody id="pending-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const Admin = {
+            password: '',
+
+            async loadPendingList() {
+                this.password = document.getElementById('admin-pw').value;
+                try {
+                    const res = await fetch('/api/admin/pending', {
+                        headers: { 'admin-password': this.password }
+                    });
+
+                    if (res.status === 403) return alert('접근 권한이 없습니다.');
+
+                    const data = await res.json();
+                    document.getElementById('login-section').classList.add('hidden');
+                    document.getElementById('admin-section').classList.remove('hidden');
+
+                    const tbody = document.getElementById('pending-list');
+                    tbody.innerHTML = '';
+                    data.forEach(user => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="font-weight: bold;">${user.name}</td>
+                            <td style="color: var(--text-dim);">${user.depositor_name}</td>
+                            <td style="font-size: 0.8rem;">${new Date(user.created_at).toLocaleString()}</td>
+                            <td><button onclick="Admin.approveUser(${user.id})" style="padding: 6px 12px; width: auto; font-size: 0.7rem;">승인</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                } catch (e) {
+                    alert('서버 통신 오류');
+                }
+            },
+
+            async approveUser(id) {
+                try {
+                    const res = await fetch('/api/admin/approve', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'admin-password': this.password
+                        },
+                        body: JSON.stringify({ id })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        alert('승인 완료!\n토큰: ' + data.token);
+                        this.loadPendingList();
+                    }
+                } catch (e) {
+                    alert('승인 처리 중 오류 발생');
+                }
+            },
+
+            startConcert() {
+                const songUrl = document.getElementById('song-select').value;
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const ws = new WebSocket(`${protocol}//${location.host}`);
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({
+                        type: 'START_CONCERT',
+                        songUrl: songUrl
+                    }));
+                    alert('공연 시작 브로드캐스트가 전송되었습니다.\n곡 정보: ' + songUrl);
+                    ws.close();
+                };
+                ws.onerror = () => alert('통신 오류: 서버 상태를 확인하세요.');
+            }
+        };
+    </script>
+</body>
+
+</html>

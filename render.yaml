@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: metaverse-concert-os
+    env: docker
+    plan: free # 또는 원하는 플랜으로 변경 가능
+    region: singapore # 한국에서 가까운 지역
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_PATH
+        value: /etc/data/database.sqlite
+      - key: PORT
+        value: 3000
+    disk:
+      name: concert-data
+      mountPath: /etc/data
+      sizeGB: 1

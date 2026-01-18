@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>METAVERSE LIVE CONCERT OS</title>
+    <link rel="stylesheet" href="css/app.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/uuid/8.3.2/uuid.min.js"></script>
+</head>
+<body>
+    <div id="loading-overlay">
+        <h2 style="color: var(--primary);">System Initializing...</h2>
+        <div class="loader" style="margin: 20px; border: 4px solid var(--glass-border); border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+    </div>
+
+    <!-- Payment View -->
+    <div id="view-payment" class="container glass-panel">
+        <h1>LIVE CONCERT</h1>
+        <p style="color: var(--text-dim); margin-bottom: 2rem;">신청 및 입금 후 입장 토큰을 받으세요.</p>
+        <div class="bank-info" style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="font-size: 0.8rem; color: var(--primary);">카카오뱅크 7777-03-4553512 / 박두리</p>
+        </div>
+        <div class="input-group">
+            <label>참가자 성함</label>
+            <input type="text" id="pay-name" placeholder="실명을 입력하세요">
+        </div>
+        <div class="input-group">
+            <label>입금자명</label>
+            <input type="text" id="pay-depositor" placeholder="입금 시 사용한 이름">
+        </div>
+        <button onclick="App.submitPayment()">신청 완료</button>
+        <p style="margin-top: 1.5rem; font-size: 0.8rem; text-align: center;">
+            이미 토큰을 받으셨나요? <a href="#" onclick="App.showView('enter')" style="color: var(--primary);">입장하기</a>
+        </p>
+    </div>
+
+    <!-- Entrance View -->
+    <div id="view-enter" class="container glass-panel hidden">
+        <h1>CONCERT LOGIN</h1>
+        <p style="color: var(--text-dim); margin-bottom: 2rem;">발급받은 토큰으로 입장하세요.</p>
+        <div class="input-group">
+            <label>참가자 성함</label>
+            <input type="text" id="enter-name" placeholder="신청 시 입력한 이름">
+        </div>
+        <div class="input-group">
+            <label>입장 토큰</label>
+            <input type="text" id="enter-token" placeholder="UUID 형식의 토큰">
+        </div>
+        <button onclick="App.enterConcert()">시스템 접속</button>
+        <p style="margin-top: 1.5rem; font-size: 0.8rem; text-align: center;">
+            <a href="#" onclick="App.showView('payment')" style="color: var(--text-dim);">이전으로 돌아가기</a>
+        </p>
+    </div>
+
+    <!-- Concert Stage Overlay (Only visible when entered) -->
+    <div id="view-stage" class="hidden">
+        <canvas id="concert-canvas"></canvas>
+        <div class="ui-overlay">
+            <div id="cheer-display" style="background: rgba(0,0,0,0.6); padding: 10px 15px; border-radius: 8px;">응원: 0</div>
+            <button class="cheer-btn" onclick="App.sendCheer()">🙌 응원하기</button>
+        </div>
+    </div>
+
+    <!-- Global Styles for Animations -->
+    <style>
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+
+    <script src="js/main.js"></script>
+    <script src="js/stage.js"></script>
+</body>
+</html>
