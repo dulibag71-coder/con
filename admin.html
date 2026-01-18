@@ -90,6 +90,16 @@
                     style="background: linear-gradient(90deg, var(--danger), #ff8800);">공연 시작 신호 발송</button>
             </div>
 
+            <div class="song-card">
+                <h3 style="color: var(--secondary); margin-bottom: 15px;">REAL-TIME VFX TRIGGER</h3>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="Admin.triggerVFX('fire')" style="background: #ff4400;">FIRE CANNON</button>
+                    <button onclick="Admin.triggerVFX('confetti')" style="background: #ff00ff;">CONFETTI</button>
+                    <button onclick="Admin.triggerVFX('glitch')" style="background: #00ffff; color: black;">GLITCH
+                        MODE</button>
+                </div>
+            </div>
+
             <h3 style="margin-top: 2rem;">PENDING REQUESTS</h3>
             <table>
                 <thead>
@@ -108,6 +118,22 @@
     <script>
         const Admin = {
             password: '',
+            socket: null,
+
+            initSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                this.socket = new WebSocket(`${protocol}//${window.location.host}`);
+                this.socket.onopen = () => console.log('Admin connected to stage');
+            },
+
+            triggerVFX(type) {
+                if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+                    this.initSocket();
+                    setTimeout(() => this.triggerVFX(type), 500);
+                    return;
+                }
+                this.socket.send(JSON.stringify({ type: 'TRIGGER_VFX', vfxType: type }));
+            },
 
             async loadPendingList() {
                 this.password = document.getElementById('admin-pw').value;

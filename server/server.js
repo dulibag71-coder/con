@@ -123,6 +123,10 @@ wss.on('connection', (ws, req) => {
                 concertState.cheerCount++;
                 broadcast({ type: 'CHEER_UPDATE', cheerCount: concertState.cheerCount });
                 break;
+
+            case 'TRIGGER_VFX':
+                broadcast({ type: 'VFX_TRIGGERED', vfxType: payload.vfxType });
+                break;
         }
     });
 });

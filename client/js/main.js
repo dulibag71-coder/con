@@ -10,7 +10,7 @@ const App = {
     init() {
         console.log("App Initializing...");
         this.hideLoading();
-        
+
         if (this.state.user && this.state.token) {
             this.showView('enter'); // Auto-fill if already applied but not entered stage
             document.getElementById('enter-name').value = this.state.user;
@@ -128,6 +128,9 @@ const App = {
             case 'CHEER_UPDATE':
                 this.state.concertState.cheerCount = payload.cheerCount;
                 this.updateUI();
+                break;
+            case 'VFX_TRIGGERED':
+                if (window.onVFXTrigger) window.onVFXTrigger(payload.vfxType);
                 break;
         }
     },
