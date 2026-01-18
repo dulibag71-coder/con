@@ -3,176 +3,197 @@ let spotLights = [];
 let cubeVisualizers = [];
 let performers = [];
 let audience = [];
+let particles = []; // Fire, Confetti, Sparks
+let stageParts = {}; // Kinetic elements
 let isAudioInitialized = false;
 
-// Dance Style Definitions
+// MEGA DANCE STYLES - 10X Re-tuned
 const DANCE_STYLES = {
-    POWER: { speed: 1.5, amplitude: 1.2, bounce: 0.8, arms: "SHARP" },
-    GROOVE: { speed: 1.0, amplitude: 1.0, bounce: 0.5, arms: "WAVE" },
-    SWAY: { speed: 0.5, amplitude: 0.8, bounce: 0.2, arms: "FLOW" }
+    LEGENDARY: { speed: 1.6, amp: 1.5, bounce: 1.2, power: true, style: "K-POP_GOD" },
+    SMOOTH_CRIMINAL: { speed: 1.0, amp: 1.2, bounce: 0.6, power: false, style: "GROOVE_MASTER" },
+    ETHEREAL: { speed: 0.6, amp: 0.8, bounce: 0.3, power: false, style: "FLOW_STATE" }
 };
 
-let currentStyle = DANCE_STYLES.GROOVE;
+let currentStyle = DANCE_STYLES.LEGENDARY;
 
-// Formations
 const formations = {
-    V_SHAPE: [{ x: 0, z: 0 }, { x: -4, z: 3 }, { x: 4, z: 3 }, { x: -8, z: 6 }, { x: 8, z: 6 }, { x: -12, z: 9 }, { x: 12, z: 9 }],
-    LINE: [{ x: -12, z: 0 }, { x: -8, z: 0 }, { x: -4, z: 0 }, { x: 0, z: 0 }, { x: 4, z: 0 }, { x: 8, z: 0 }, { x: 12, z: 0 }],
-    ARROW: [{ x: 0, z: -4 }, { x: -3, z: -1 }, { x: 3, z: -1 }, { x: -6, z: 2 }, { x: 6, z: 2 }, { x: -9, z: 5 }, { x: 9, z: 5 }],
-    CIRCLE: Array.from({ length: 7 }, (_, i) => ({
-        x: Math.cos(i / 7 * Math.PI * 2) * 10,
-        z: Math.sin(i / 7 * Math.PI * 2) * 10
-    }))
+    DIAMOND: [{ x: 0, z: 0 }, { x: -4, z: 4 }, { x: 4, z: 4 }, { x: 0, z: 8 }, { x: -8, z: 8 }, { x: 8, z: 8 }, { x: 0, z: 12 }],
+    V_POWER: [{ x: 0, z: 0 }, { x: -5, z: 3 }, { x: 5, z: 3 }, { x: -10, z: 6 }, { x: 10, z: 6 }, { x: -15, z: 9 }, { x: 15, z: 9 }],
+    LINE_X: [{ x: -15, z: 0 }, { x: -10, z: 0 }, { x: -5, z: 0 }, { x: 0, z: 0 }, { x: 5, z: 0 }, { x: 10, z: 0 }, { x: 15, z: 0 }],
+    WAVE: Array.from({ length: 7 }, (_, i) => ({ x: (i - 3) * 6, z: Math.sin(i) * 5 }))
 };
 
-let currentFormation = formations.V_SHAPE;
+let currentFormation = formations.DIAMOND;
 let formationKeys = Object.keys(formations);
 let formationIndex = 0;
 
-// Avatar Creator with Refined Joints
+// Hyper-Refined Avatar with Pro Joints & Pelvic Control
 function createAvatar(color, isPerformer = false) {
     const group = new THREE.Group();
 
-    // Body - Multi-part for smoother bending
-    const bodyGroup = new THREE.Group();
-    const upperBodyGeo = new THREE.BoxGeometry(1, 0.7, 0.5);
-    const bodyMat = new THREE.MeshStandardMaterial({
+    // Joint Hierarchy: Pelvis -> Torso -> Neck -> Head
+    const pelvis = new THREE.Group();
+    pelvis.position.y = 0.8;
+    group.add(pelvis);
+
+    const torso = new THREE.Group();
+    torso.position.y = 0.4;
+    pelvis.add(torso);
+
+    const mat = new THREE.MeshStandardMaterial({
         color: color,
-        metalness: isPerformer ? 0.7 : 0.1,
-        roughness: isPerformer ? 0.3 : 0.9
+        metalness: isPerformer ? 0.9 : 0.1,
+        roughness: isPerformer ? 0.1 : 0.9,
+        emissive: color,
+        emissiveIntensity: isPerformer ? 0.2 : 0
     });
-    const upperBody = new THREE.Mesh(upperBodyGeo, bodyMat);
-    upperBody.position.y = 1.45;
-    bodyGroup.add(upperBody);
 
-    const lowerBodyGeo = new THREE.BoxGeometry(0.9, 0.5, 0.45);
-    const lowerBody = new THREE.Mesh(lowerBodyGeo, bodyMat);
-    lowerBody.position.y = 0.85;
-    bodyGroup.add(lowerBody);
-    group.add(bodyGroup);
+    const chest = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 0.6), mat);
+    chest.position.y = 0.4;
+    torso.add(chest);
 
-    // Head
-    const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
-    const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
-    const head = new THREE.Mesh(headGeo, headMat);
-    head.position.y = 2.1;
-    group.add(head);
+    const headGroup = new THREE.Group();
+    headGroup.position.y = 0.9;
+    torso.add(headGroup);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), new THREE.MeshStandardMaterial({ color: 0xffdbac }));
+    headGroup.add(head);
 
-    // Arms - Hierarchical joints
-    const createArm = (side) => {
-        const armPivot = new THREE.Group();
-        armPivot.position.set(side * 0.7, 1.7, 0);
+    // Advanced Limbs (Elbows & Knees)
+    const createLimb = (side, isArm) => {
+        const root = new THREE.Group();
+        root.position.set(side * (isArm ? 0.75 : 0.4), isArm ? 0.6 : 0, 0);
 
-        const upperArmGeo = new THREE.BoxGeometry(0.25, 0.6, 0.25);
-        const upperArm = new THREE.Mesh(upperArmGeo, bodyMat);
-        upperArm.position.y = -0.3;
-        armPivot.add(upperArm);
+        const upper = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.7, 0.3), mat);
+        upper.position.y = -0.3;
+        root.add(upper);
 
-        const lowerArmPivot = new THREE.Group();
-        lowerArmPivot.position.y = -0.6;
+        const midJoint = new THREE.Group();
+        midJoint.position.y = -0.35;
+        upper.add(midJoint);
 
-        const lowerArmGeo = new THREE.BoxGeometry(0.22, 0.6, 0.22);
-        const lowerArm = new THREE.Mesh(lowerArmGeo, bodyMat);
-        lowerArm.position.y = -0.3;
-        lowerArmPivot.add(lowerArm);
-        upperArm.add(lowerArmPivot);
+        const lower = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.7, 0.25), mat);
+        lower.position.y = -0.35;
+        midJoint.add(lower);
 
-        return { pivot: armPivot, lower: lowerArmPivot };
+        return { root, mid: midJoint, lower };
     };
 
-    const leftArmSet = createArm(-1);
-    const rightArmSet = createArm(1);
-    group.add(leftArmSet.pivot);
-    group.add(rightArmSet.pivot);
+    const lArm = createLimb(-1, true);
+    const rArm = createLimb(1, true);
+    const lLeg = createLimb(-1, false);
+    const rLeg = createLimb(1, false);
 
-    // Legs
-    const legGeo = new THREE.BoxGeometry(0.35, 0.7, 0.35);
-    const leftLeg = new THREE.Mesh(legGeo, bodyMat);
-    leftLeg.position.set(-0.35, 0.35, 0);
-    group.add(leftLeg);
-
-    const rightLeg = new THREE.Mesh(legGeo, bodyMat);
-    rightLeg.position.set(0.35, 0.35, 0);
-    group.add(rightLeg);
+    torso.add(lArm.root);
+    torso.add(rArm.root);
+    pelvis.add(lLeg.root);
+    pelvis.add(rLeg.root);
 
     return {
         group,
-        parts: { bodyGroup, head, leftArm: leftArmSet, rightArm: rightArmSet, leftLeg, rightLeg },
+        parts: { pelvis, torso, headGroup, lArm, rArm, lLeg, rLeg },
         isPerformer,
-        animOffset: Math.random() * Math.PI * 2
+        animOffset: Math.random() * Math.PI * 2,
+        vibe: Math.random()
     };
 }
 
 function initThreeJS() {
     if (renderer) return;
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020204);
-    scene.fog = new THREE.FogExp2(0x020204, 0.008);
+    scene.background = new THREE.Color(0x010103);
+    scene.fog = new THREE.FogExp2(0x010103, 0.005);
 
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 15, 40);
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 20, 60);
 
-    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('concert-canvas'), antialias: true });
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('concert-canvas'), antialias: true, powerPreference: "high-performance" });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.outputEncoding = THREE.sRGBEncoding;
 
-    // Floor & Stage
-    const floorGeo = new THREE.PlaneGeometry(500, 500);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.9 });
+    // KINETIC STAGE DESIGN
+    const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x020202, roughness: 0.1, metalness: 1.0 });
     floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
-    const stageGeo = new THREE.BoxGeometry(50, 2, 30);
-    const stageMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.9, roughness: 0.15 });
-    stage = new THREE.Mesh(stageGeo, stageMat);
-    stage.position.y = 1;
-    scene.add(stage);
+    // Main Kinetic Platform
+    const mainStage = new THREE.Group();
+    const baseStage = new THREE.Mesh(new THREE.BoxGeometry(60, 3, 40), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 1, roughness: 0.2 }));
+    baseStage.position.y = 1.5;
+    mainStage.add(baseStage);
+    scene.add(mainStage);
+    stageParts.main = mainStage;
 
-    // Visualizers
-    for (let i = 0; i < 64; i++) {
-        const barGeo = new THREE.BoxGeometry(0.5, 1, 0.5);
-        const barMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.8 });
-        const bar = new THREE.Mesh(barGeo, barMat);
-        bar.position.set((i - 32) * 0.8, 2, -12);
+    // LED Wings
+    const wingGeo = new THREE.BoxGeometry(20, 40, 1);
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0x050505, emissive: 0x00ffff, emissiveIntensity: 2 });
+    const lWing = new THREE.Mesh(wingGeo, wingMat);
+    lWing.position.set(-45, 20, -15);
+    lWing.rotation.y = Math.PI / 6;
+    scene.add(lWing);
+    stageParts.lWing = lWing;
+
+    const rWing = new THREE.Mesh(wingGeo, wingMat);
+    rWing.position.set(45, 20, -15);
+    rWing.rotation.y = -Math.PI / 6;
+    scene.add(rWing);
+    stageParts.rWing = rWing;
+
+    // Mega Visualizer Wall
+    for (let i = 0; i < 128; i++) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1, 0.6), new THREE.MeshStandardMaterial({ color: 0xff00ff, emissive: 0xff00ff, emissiveIntensity: 1 }));
+        bar.position.set((i - 64) * 0.8, -10, -30);
         scene.add(bar);
         cubeVisualizers.push(bar);
     }
 
-    // BTS-style Group (7 members)
-    const colors = [0xff0088, 0x00ff88, 0x00d4ff, 0xffaa00, 0xffffff, 0x9900ff, 0xff0000];
-    for (let i = 0; i < 7; i++) {
-        const p = createAvatar(colors[i], true);
-        p.group.scale.set(1.8, 1.8, 1.8);
+    // Pro Performers
+    const colors = [0xff0088, 0x00ff88, 0x00d4ff, 0xffaa00, 0xffffff, 0xaa00ff, 0xff4400];
+    colors.forEach(c => {
+        const p = createAvatar(c, true);
+        p.group.scale.set(2.2, 2.2, 2.2);
         scene.add(p.group);
         performers.push(p);
-    }
+    });
 
-    // Larger Audience
-    for (let i = 0; i < 80; i++) {
-        const color = new THREE.Color().setHSL(Math.random(), 0.5, 0.3);
-        const aud = createAvatar(color, false);
-        aud.group.position.set((Math.random() - 0.5) * 80, 0, 20 + Math.random() * 40);
-        aud.group.rotation.y = Math.PI + (Math.random() - 0.5);
+    // Epic Crowd
+    for (let i = 0; i < 150; i++) {
+        const aud = createAvatar(new THREE.Color().setHSL(Math.random(), 0.7, 0.4), false);
+        aud.group.position.set((Math.random() - 0.5) * 150, 0, 30 + Math.random() * 100);
         scene.add(aud.group);
         audience.push(aud);
     }
 
-    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-    scene.add(ambient);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
-    const spotColors = [0x00d4ff, 0xff00ff, 0x00ff88, 0xffaa00, 0xffffff];
-    spotColors.forEach((color, i) => {
-        const spot = new THREE.SpotLight(color, 25);
-        spot.position.set((i - 2) * 20, 50, -15);
-        spot.target = stage;
-        spot.angle = Math.PI / 6;
-        spot.penumbra = 0.5;
+    // Volumetric-like Spotlights
+    for (let i = 0; i < 8; i++) {
+        const spot = new THREE.SpotLight(0xffffff, 40);
+        spot.position.set((i - 3.5) * 30, 80, -20);
+        spot.angle = 0.3;
+        spot.penumbra = 0.8;
+        spot.target = baseStage;
         scene.add(spot);
         spotLights.push(spot);
-    });
+    }
 
     animate();
+}
+
+function spawnParticle(type, pos, color) {
+    const geo = new THREE.SphereGeometry(type === 'fire' ? 0.4 : 0.1);
+    const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 1 });
+    const p = new THREE.Mesh(geo, mat);
+    p.position.copy(pos);
+    p.userData = {
+        vel: new THREE.Vector3((Math.random() - 0.5) * 0.5, type === 'fire' ? 0.8 : 0.2, (Math.random() - 0.5) * 0.5),
+        life: 1.0,
+        type: type
+    };
+    scene.add(p);
+    particles.push(p);
 }
 
 function initAudioContext(audioElement) {
@@ -180,7 +201,7 @@ function initAudioContext(audioElement) {
     const context = new (window.AudioContext || window.webkitAudioContext)();
     const source = context.createMediaElementSource(audioElement);
     analyzer = context.createAnalyser();
-    analyzer.fftSize = 512;
+    analyzer.fftSize = 1024;
     source.connect(analyzer);
     analyzer.connect(context.destination);
     dataArray = new Uint8Array(analyzer.frequencyBinCount);
@@ -188,111 +209,107 @@ function initAudioContext(audioElement) {
 }
 
 window.onConcertStart = (songUrl) => {
-    // Detect Style from Name/Url (Very simple logic for demo)
-    const lowerUrl = songUrl.toLowerCase();
-    if (lowerUrl.includes('dance') || lowerUrl.includes('fast')) currentStyle = DANCE_STYYLES.POWER;
-    else if (lowerUrl.includes('bt') || lowerUrl.includes('pop')) currentStyle = DANCE_STYLES.POWER;
-    else if (lowerUrl.includes('slow') || lowerUrl.includes('ballad')) currentStyle = DANCE_STYLES.SWAY;
-    else currentStyle = DANCE_STYLES.GROOVE;
+    const l = songUrl.toLowerCase();
+    if (l.includes('pop') || l.includes('bts') || l.includes('fast')) currentStyle = DANCE_STYLES.LEGENDARY;
+    else if (l.includes('slow')) currentStyle = DANCE_STYLES.ETHEREAL;
+    else currentStyle = DANCE_STYLES.SMOOTH_CRIMINAL;
 
     const audio = new Audio(songUrl);
     audio.crossOrigin = "anonymous";
-    audio.play().then(() => {
-        initAudioContext(audio);
-    }).catch(e => console.log("Audio play failed"));
+    audio.play().then(() => initAudioContext(audio));
 };
 
 function animate() {
     requestAnimationFrame(animate);
     const time = Date.now() * 0.001;
-    let energy = { bass: 0, mid: 0, high: 0, peak: false };
+    let energy = { b: 0, m: 0, h: 0, peak: false };
 
     if (isAudioInitialized && analyzer) {
         analyzer.getByteFrequencyData(dataArray);
-        const bR = 10, mR = 100;
-        for (let i = 0; i < bR; i++) energy.bass += dataArray[i];
-        for (let i = bR; i < mR; i++) energy.mid += dataArray[i];
-        for (let i = mR; i < dataArray.length; i++) energy.high += dataArray[i];
-        energy.bass /= bR; energy.mid /= (mR - bR); energy.high /= (dataArray.length - mR);
-        energy.peak = energy.bass > 210;
+        for (let i = 0; i < 10; i++) energy.b += dataArray[i];
+        for (let i = 10; i < 100; i++) energy.m += dataArray[i];
+        for (let i = 100; i < 500; i++) energy.h += dataArray[i];
+        energy.b /= 10; energy.m /= 90; energy.h /= 400;
+        energy.peak = energy.b > 215;
 
         cubeVisualizers.forEach((bar, i) => {
-            const freq = dataArray[i % dataArray.length];
-            const scale = 1 + (freq / 255) * 25;
-            bar.scale.y = scale;
-            bar.position.y = 2 + scale / 2;
-            bar.material.emissiveIntensity = freq / 255 + 1.0;
+            const v = dataArray[i % 512];
+            bar.scale.y = 1 + (v / 255) * 60;
+            bar.position.y = (bar.scale.y / 2) - 10;
+            bar.material.emissiveIntensity = v / 255 * 5;
         });
     }
 
-    const bI = energy.bass / 255;
-    const mI = energy.mid / 255;
-    const hI = energy.high / 255;
+    const b = energy.b / 255, m = energy.m / 255, h = energy.h / 255;
 
-    // Fast formation switch for POWER style
-    const switchInterval = currentStyle === DANCE_STYLES.POWER ? 4 : 8;
-    if (Math.floor(time) % switchInterval === 0 && (time % 1 < 0.015)) {
-        formationIndex = (formationIndex + 1) % formationKeys.length;
-        currentFormation = formations[formationKeys[formationIndex]];
+    // 1. KINETIC STAGE ANIMATION
+    stageParts.main.position.y = Math.sin(time * 0.5) * 2 * m;
+    stageParts.lWing.rotation.z = Math.sin(time) * 0.2 * b;
+    stageParts.rWing.rotation.z = -Math.sin(time) * 0.2 * b;
+    if (energy.peak) {
+        stageParts.lWing.material.emissiveIntensity = 10;
+        for (let i = 0; i < 5; i++) spawnParticle('fire', new THREE.Vector3((Math.random() - 0.5) * 50, 2, -10), 0xffaa00);
+    } else {
+        stageParts.lWing.material.emissiveIntensity = THREE.MathUtils.lerp(stageParts.lWing.material.emissiveIntensity, 1, 0.1);
     }
 
-    // Professional Animation Logic
-    const fullSync = time * 4 * currentStyle.speed;
-
+    // 2. ULTIMATE DANCE ENGINE
+    const sync = time * 5 * currentStyle.speed;
     performers.forEach((p, i) => {
-        const { group, parts, animOffset } = p;
-
-        // 1. Formation LERP
+        const { parts, group, animOffset } = p;
         const tar = currentFormation[i];
-        group.position.x = THREE.MathUtils.lerp(group.position.x, tar.x, 0.05);
-        group.position.z = THREE.MathUtils.lerp(group.position.z, tar.z, 0.05);
+        group.position.x = THREE.MathUtils.lerp(group.position.x, tar.x, 0.04);
+        group.position.z = THREE.MathUtils.lerp(group.position.z, tar.z, 0.04);
 
-        // 2. Body Core Motion
-        group.position.y = 2 + (Math.abs(Math.sin(fullSync)) * currentStyle.bounce * bI) + (energy.peak ? 1.5 : 0);
-        group.rotation.z = Math.sin(fullSync * 0.5) * 0.1 * mI * currentStyle.amplitude;
+        // Core Physics: Pelvic Weight & Rebound
+        const bounce = Math.abs(Math.sin(sync)) * currentStyle.bounce * b;
+        parts.pelvis.position.y = 0.8 + bounce + (energy.peak ? 1.2 : 0);
+        parts.torso.rotation.x = Math.sin(sync) * 0.2 * m;
+        parts.torso.rotation.z = Math.cos(sync * 0.5) * 0.15 * m;
 
-        // 3. Fluid Limb Motion (Hierarchical)
-        if (currentStyle.arms === "SHARP") {
-            // IDC/BTS POWER Move
-            const armAngle = (energy.peak ? Math.PI : Math.PI * 0.3) * Math.sin(fullSync);
-            parts.leftArm.pivot.rotation.z = -1.2 - armAngle;
-            parts.rightArm.pivot.rotation.z = 1.2 + armAngle;
-            parts.leftArm.lower.rotation.z = -Math.sin(fullSync) * 1.5 * bI;
-            parts.rightArm.lower.rotation.z = Math.sin(fullSync) * 1.5 * bI;
-        } else if (currentStyle.arms === "WAVE") {
-            // Groovy Waves
-            parts.leftArm.pivot.rotation.x = Math.sin(fullSync + i * 0.5) * 1.5 * mI;
-            parts.rightArm.pivot.rotation.x = Math.cos(fullSync + i * 0.5) * 1.5 * mI;
-            parts.leftArm.lower.rotation.x = Math.sin(fullSync * 0.8) * 2;
-            parts.rightArm.lower.rotation.x = Math.cos(fullSync * 0.8) * 2;
-        } else {
-            // Elegant Sway
-            parts.leftArm.pivot.rotation.z = -0.5 + Math.sin(fullSync * 0.5) * 1.5;
-            parts.rightArm.pivot.rotation.z = 0.5 - Math.sin(fullSync * 0.5) * 1.5;
+        // IK-inspired Limb Logic
+        const armWave = Math.sin(sync + i * 0.2) * currentStyle.amp;
+        parts.lArm.root.rotation.z = -1.2 - armWave * m;
+        parts.rArm.root.rotation.z = 1.2 + armWave * m;
+        parts.lArm.mid.rotation.z = -Math.abs(armWave) * 1.5 * b;
+        parts.rArm.mid.rotation.z = Math.abs(armWave) * 1.5 * b;
+
+        // Leg Grounding
+        parts.lLeg.root.rotation.x = Math.sin(sync) * 0.5 * b;
+        parts.rLeg.root.rotation.x = -Math.sin(sync) * 0.5 * b;
+        parts.lLeg.mid.rotation.x = Math.max(0, Math.sin(sync) * 1.0) * b;
+        parts.rLeg.mid.rotation.x = Math.max(0, -Math.sin(sync) * 1.0) * b;
+
+        parts.headGroup.rotation.y = Math.sin(sync * 2) * 0.3 * h;
+    });
+
+    // 3. PARTICLE PHYSICS
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.position.add(p.userData.vel);
+        p.userData.life -= 0.02;
+        p.material.opacity = p.userData.life;
+        if (p.userData.life <= 0) {
+            scene.remove(p);
+            particles.splice(i, 1);
         }
+    }
 
-        // Head bounce
-        parts.head.rotation.x = Math.sin(fullSync * 2) * 0.2 * bI;
+    // 4. CINEMATIC DIRECTOR AI
+    const camTargetY = 5 + b * 10;
+    if (energy.peak && time % 2 < 0.02) {
+        // Dramatic Cut
+        camera.position.set((Math.random() - 0.5) * 100, 10 + Math.random() * 40, 40 + Math.random() * 60);
+    }
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, Math.sin(time * 0.2) * 40, 0.01);
+    camera.lookAt(0, camTargetY, 0);
+
+    // 5. STADIUM LIGHTING
+    spotLights.forEach((s, i) => {
+        s.intensity = (energy.peak ? 100 : 20 + b * 50);
+        s.color.setHSL((time * 0.1 + i * 0.1) % 1, 0.8, 0.5);
+        s.position.x = Math.sin(time * 0.3 + i) * 60;
     });
-
-    // Audience: Cheering style depends on song
-    audience.forEach(aud => {
-        const force = currentStyle === DANCE_STYLES.POWER ? 2.0 : 1.0;
-        aud.group.position.y = Math.abs(Math.sin(time * 2 + aud.animOffset)) * force * bI;
-        aud.parts.leftArm.pivot.rotation.z = -0.5 - mI * 2;
-        aud.parts.rightArm.pivot.rotation.z = 0.5 + mI * 2;
-    });
-
-    // Epic Camera & Lights
-    const lightInt = (energy.peak ? 60 : 15 + bI * 30);
-    spotLights.forEach((spot, i) => {
-        spot.intensity = lightInt + (App.state.concertState?.cheerCount || 0) * 1.5;
-        spot.position.x = Math.sin(time * 0.3 + i) * 40;
-    });
-
-    camera.position.x = Math.sin(time * 0.15) * 25;
-    camera.position.z = 45 + Math.cos(time * 0.1) * 10;
-    camera.lookAt(0, 6, 0);
 
     renderer.render(scene, camera);
 }
