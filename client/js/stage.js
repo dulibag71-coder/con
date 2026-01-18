@@ -1,16 +1,45 @@
 let scene, camera, renderer, stage, floor, analyzer, dataArray;
 let spotLights = [];
 let cubeVisualizers = [];
-let avatars = []; // { group, parts, onStage, animOffset, currentMove }
+let performers = []; // BTS-style 7 members
+let audience = [];
 let isAudioInitialized = false;
 
+// Formation Data
+const formations = {
+    V_SHAPE: [
+        { x: 0, z: 0 }, { x: -3, z: 2 }, { x: 3, z: 2 },
+        { x: -6, z: 4 }, { x: 6, z: 4 }, { x: -9, z: 6 }, { x: 9, z: 6 }
+    ],
+    LINE: [
+        { x: -9, z: 0 }, { x: -6, z: 0 }, { x: -3, z: 0 },
+        { x: 0, z: 0 }, { x: 3, z: 0 }, { x: 6, z: 0 }, { x: 9, z: 0 }
+    ],
+    ARROW: [
+        { x: 0, z: -3 }, { x: -2, z: -1 }, { x: 2, z: -1 },
+        { x: -4, z: 1 }, { x: 4, z: 1 }, { x: -6, z: 3 }, { x: 6, z: 3 }
+    ],
+    X_SHAPE: [
+        { x: 0, z: 0 }, { x: -4, z: -4 }, { x: 4, z: -4 },
+        { x: -8, z: -8 }, { x: 8, z: -8 }, { x: -4, z: 4 }, { x: 4, z: 4 }
+    ]
+};
+
+let currentFormation = formations.V_SHAPE;
+let formationKeys = Object.keys(formations);
+let formationIndex = 0;
+
 // Avatar Creator
-function createAvatar(color, onStage = false) {
+function createAvatar(color, isPerformer = false) {
     const group = new THREE.Group();
 
     // Body
     const bodyGeo = new THREE.BoxGeometry(1, 1.2, 0.5);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: color });
+    const bodyMat = new THREE.MeshStandardMaterial({
+        color: color,
+        metalness: isPerformer ? 0.8 : 0.2,
+        roughness: isPerformer ? 0.2 : 0.8
+    });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
     body.position.y = 1.1;
     group.add(body);
@@ -25,15 +54,13 @@ function createAvatar(color, onStage = false) {
     // Arms
     const armGeo = new THREE.BoxGeometry(0.3, 0.8, 0.3);
     const leftArm = new THREE.Mesh(armGeo, bodyMat);
-    leftArm.position.set(-0.7, 1.1, 0);
-    leftArm.geometry.translate(0, -0.4, 0); // Pivot at shoulder
-    leftArm.position.y = 1.5;
+    leftArm.geometry.translate(0, -0.4, 0);
+    leftArm.position.set(-0.7, 1.5, 0);
     group.add(leftArm);
 
     const rightArm = new THREE.Mesh(armGeo, bodyMat);
-    rightArm.position.set(0.7, 1.1, 0);
-    rightArm.geometry.translate(0, -0.4, 0); // Pivot at shoulder
-    rightArm.position.y = 1.5;
+    rightArm.geometry.translate(0, -0.4, 0);
+    rightArm.position.set(0.7, 1.5, 0);
     group.add(rightArm);
 
     // Legs
@@ -48,9 +75,10 @@ function createAvatar(color, onStage = false) {
 
     return {
         group,
-        parts: { body, head, leftArm, rightArm, leftLeg, rightLeg },
-        onStage,
-        animOffset: Math.random() * Math.PI * 2
+        parts: { body, head, leftArm, rightArm, leftLeg, rightLeg, armMat: bodyMat },
+        isPerformer,
+        animOffset: Math.random() * Math.PI * 2,
+        targetPos: new THREE.Vector3()
     };
 }
 
@@ -58,11 +86,11 @@ function initThreeJS() {
     if (renderer) return;
 
     scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050508);
-    scene.fog = new THREE.FogExp2(0x050508, 0.012);
+    scene.background = new THREE.Color(0x020205);
+    scene.fog = new THREE.FogExp2(0x020205, 0.01);
 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 10, 25);
+    camera.position.set(0, 15, 35);
     camera.lookAt(0, 5, 0);
 
     renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('concert-canvas'), antialias: true });
@@ -70,55 +98,59 @@ function initThreeJS() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
     // Floor & Stage
-    const floorGeo = new THREE.PlaneGeometry(200, 200);
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.1, metalness: 0.9 });
+    const floorGeo = new THREE.PlaneGeometry(300, 300);
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.1, metalness: 0.9 });
     floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
-    const stageGeo = new THREE.BoxGeometry(20, 1.5, 10);
-    const stageMat = new THREE.MeshStandardMaterial({ color: 0x151515, metalness: 0.9, roughness: 0.2 });
+    const stageGeo = new THREE.BoxGeometry(40, 1.5, 20);
+    const stageMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.1 });
     stage = new THREE.Mesh(stageGeo, stageMat);
     stage.position.y = 0.75;
     scene.add(stage);
 
     // Visualizer Bars
-    for (let i = 0; i < 32; i++) {
-        const barGeo = new THREE.BoxGeometry(0.3, 1, 0.3);
+    for (let i = 0; i < 64; i++) {
+        const barGeo = new THREE.BoxGeometry(0.4, 1, 0.4);
         const barMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 });
         const bar = new THREE.Mesh(barGeo, barMat);
-        bar.position.set((i - 16) * 0.6, 1.5, -4.5);
+        bar.position.set((i - 32) * 0.7, 1.5, -9);
         scene.add(bar);
         cubeVisualizers.push(bar);
     }
 
-    // Performer
-    const performer = createAvatar(0xff0088, true);
-    performer.group.scale.set(1.5, 1.5, 1.5);
-    performer.group.position.set(0, 1.5, 0);
-    scene.add(performer.group);
-    avatars.push(performer);
-
-    // Audience
-    for (let i = 0; i < 40; i++) {
-        const color = new THREE.Color().setHSL(Math.random(), 0.7, 0.5);
-        const audience = createAvatar(color, false);
-        audience.group.position.set((Math.random() - 0.5) * 50, 0, 12 + Math.random() * 20);
-        audience.group.rotation.y = Math.PI + (Math.random() - 0.5) * 0.5;
-        scene.add(audience.group);
-        avatars.push(audience);
+    // BTS-style Group (7 members)
+    const PerformerColors = [0xff0088, 0x00ff88, 0x00d4ff, 0xffaa00, 0xffffff, 0xaa00ff, 0xff0000];
+    for (let i = 0; i < 7; i++) {
+        const p = createAvatar(PerformerColors[i], true);
+        p.group.scale.set(1.6, 1.6, 1.6);
+        p.group.position.set(currentFormation[i].x, 1.5, currentFormation[i].z);
+        scene.add(p.group);
+        performers.push(p);
     }
 
-    const ambient = new THREE.AmbientLight(0x404040, 0.5);
+    // Audience
+    for (let i = 0; i < 50; i++) {
+        const color = new THREE.Color().setHSL(Math.random(), 0.6, 0.4);
+        const aud = createAvatar(color, false);
+        aud.group.position.set((Math.random() - 0.5) * 60, 0, 15 + Math.random() * 30);
+        aud.group.rotation.y = Math.PI + (Math.random() - 0.5) * 0.4;
+        scene.add(aud.group);
+        audience.push(aud);
+    }
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.3);
     scene.add(ambient);
 
+    // Dynamic Spotlights
     const colors = [0x00d4ff, 0xff00ff, 0x00ff88, 0xffaa00];
     colors.forEach((color, i) => {
-        const spot = new THREE.SpotLight(color, 15);
-        spot.position.set((i - 1.5) * 15, 30, -10);
+        const spot = new THREE.SpotLight(color, 20);
+        spot.position.set((i - 1.5) * 20, 40, -10);
         spot.target = stage;
-        spot.angle = Math.PI / 6;
-        spot.penumbra = 0.5;
+        spot.angle = Math.PI / 5;
+        spot.penumbra = 0.6;
         scene.add(spot);
         spotLights.push(spot);
     });
@@ -131,7 +163,7 @@ function initAudioContext(audioElement) {
     const context = new (window.AudioContext || window.webkitAudioContext)();
     const source = context.createMediaElementSource(audioElement);
     analyzer = context.createAnalyser();
-    analyzer.fftSize = 256;
+    analyzer.fftSize = 512;
     source.connect(analyzer);
     analyzer.connect(context.destination);
     dataArray = new Uint8Array(analyzer.frequencyBinCount);
@@ -150,31 +182,26 @@ function animate() {
     requestAnimationFrame(animate);
     const time = Date.now() * 0.001;
 
-    let energy = { bass: 0, mid: 0, high: 0, all: 0 };
+    let energy = { bass: 0, mid: 0, high: 0, peak: false };
 
     if (isAudioInitialized && analyzer) {
         analyzer.getByteFrequencyData(dataArray);
 
-        // Split frequencies
-        const bCount = Math.floor(dataArray.length * 0.1);
-        const mCount = Math.floor(dataArray.length * 0.4);
+        let sum = 0;
+        const bRange = 10, mRange = 100;
+        for (let i = 0; i < bRange; i++) energy.bass += dataArray[i];
+        for (let i = bRange; i < mRange; i++) energy.mid += dataArray[i];
+        for (let i = mRange; i < dataArray.length; i++) energy.high += dataArray[i];
 
-        for (let i = 0; i < dataArray.length; i++) {
-            const v = dataArray[i];
-            energy.all += v;
-            if (i < bCount) energy.bass += v;
-            else if (i < bCount + mCount) energy.mid += v;
-            else energy.high += v;
-        }
+        energy.bass /= bRange;
+        energy.mid /= (mRange - bRange);
+        energy.high /= (dataArray.length - mRange);
 
-        energy.all /= dataArray.length;
-        energy.bass /= bCount;
-        energy.mid /= mCount;
-        energy.high /= (dataArray.length - bCount - mCount);
+        energy.peak = energy.bass > 220;
 
         cubeVisualizers.forEach((bar, i) => {
             const freq = dataArray[i % dataArray.length];
-            const scale = 1 + (freq / 255) * 15;
+            const scale = 1 + (freq / 255) * 20;
             bar.scale.y = scale;
             bar.position.y = 1.5 + scale / 2;
             bar.material.emissiveIntensity = freq / 255 + 0.5;
@@ -185,48 +212,63 @@ function animate() {
     const midInt = energy.mid / 255;
     const highInt = energy.high / 255;
 
-    avatars.forEach(avatar => {
-        const { group, parts, animOffset, onStage } = avatar;
-        const syncTime = time * 2 + animOffset;
+    // Formation Switch Logic (Every 8 seconds or on peak)
+    if (Math.floor(time) % 8 === 0 && (time % 1 < 0.02)) {
+        formationIndex = (formationIndex + 1) % formationKeys.length;
+        currentFormation = formations[formationKeys[formationIndex]];
+    }
 
-        // 1. COMPLEX BODY MOTION (BASS-DRIVEN)
-        // Bobbing & Jumping
-        const jump = Math.max(0, bassInt - 0.7) * 5;
-        group.position.y = (onStage ? 1.5 : 0) + (Math.abs(Math.sin(syncTime * 4)) * 0.3 * bassInt) + jump;
+    // Performers: BTS-STYLE KNIFE CHOREOGRAPHY
+    performers.forEach((p, i) => {
+        const { group, parts, animOffset } = p;
+        const moveTime = time * 4; // Sharp speed
 
-        // Side-to-side sway
-        group.rotation.z = Math.sin(syncTime * 2) * 0.1 * midInt;
-        group.rotation.y = (onStage ? 0 : Math.PI) + Math.sin(syncTime) * 0.2;
+        // 1. Formation Positioning
+        const target = currentFormation[i];
+        group.position.x = THREE.MathUtils.lerp(group.position.x, target.x, 0.05);
+        group.position.z = THREE.MathUtils.lerp(group.position.z, target.z, 0.05);
 
-        // 2. ARM MOTIONS (MID/HIGH-DRIVEN)
-        if (onStage) {
-            // Performer: Wave arms aggressively to highs
-            parts.leftArm.rotation.z = -1.5 + Math.sin(syncTime * 10) * highInt * 2;
-            parts.rightArm.rotation.z = 1.5 - Math.sin(syncTime * 10 + Math.PI) * highInt * 2;
-            parts.leftArm.rotation.x = Math.sin(syncTime * 5) * 1.5 * midInt;
-            parts.rightArm.rotation.x = Math.cos(syncTime * 5) * 1.5 * midInt;
+        // 2. Synchronized Moves (칼군무)
+        const isUpbeat = Math.sin(moveTime * Math.PI) > 0;
+
+        // Body jump on bass
+        group.position.y = 1.5 + (energy.peak ? 2 * bassInt : Math.abs(Math.sin(moveTime)) * 0.5 * bassInt);
+
+        // Sharp Arm Motions
+        if (energy.peak) {
+            // "Knife" move: Arms straight up/down
+            parts.leftArm.rotation.z = -Math.PI * 0.8;
+            parts.rightArm.rotation.z = Math.PI * 0.8;
         } else {
-            // Audience: Hands up on bass/mid peaks
-            const handsUp = midInt * 2;
-            parts.leftArm.rotation.z = -handsUp + Math.sin(syncTime * 4) * 0.2;
-            parts.rightArm.rotation.z = handsUp - Math.sin(syncTime * 4) * 0.2;
+            // Complex sync: Alternating arm waves
+            parts.leftArm.rotation.z = -1 + Math.sin(moveTime + i * 0.1) * 2 * midInt;
+            parts.rightArm.rotation.z = 1 - Math.cos(moveTime + i * 0.1) * 2 * midInt;
+            parts.leftArm.rotation.x = Math.sin(moveTime * 2) * 1.5 * highInt;
         }
 
-        // 3. HEAD (SNARE/MID-DRIVEN)
-        parts.head.rotation.x = Math.sin(syncTime * 8) * 0.3 * midInt;
-        parts.head.position.y = 2.0 + Math.sin(syncTime * 8) * 0.05 * midInt;
+        // Head tracking
+        parts.head.rotation.y = Math.sin(time * 10) * 0.2 * highInt;
+        parts.head.rotation.x = Math.sin(moveTime * 2) * 0.3 * bassInt;
     });
 
-    // Lights (Energy-synced)
+    // Audience: Simple cheering
+    audience.forEach(aud => {
+        const { group, parts, animOffset } = aud;
+        group.position.y = Math.abs(Math.sin(time * 3 + animOffset)) * 0.6 * bassInt;
+        parts.leftArm.rotation.z = -0.5 - midInt * 2;
+        parts.rightArm.rotation.z = 0.5 + midInt * 2;
+    });
+
+    // Dynamic Lighting (Concert Mode)
     spotLights.forEach((spot, i) => {
-        const pulse = (i % 2 === 0 ? bassInt : highInt) * 20;
-        spot.intensity = 5 + pulse + (App.state.concertState?.cheerCount || 0) * 0.5;
-        spot.position.x += Math.sin(time + i) * 0.2;
+        const pulse = (energy.peak ? 50 : 10 + bassInt * 20);
+        spot.intensity = pulse + (App.state.concertState?.cheerCount || 0) * 1;
+        spot.position.x = Math.sin(time * 0.5 + i) * 30;
     });
 
-    // Dynamic Camera
-    camera.position.x = Math.sin(time * 0.5) * 8;
-    camera.position.z = 25 + Math.cos(time * 0.3) * 5;
+    // Pro Camera Work
+    camera.position.x = Math.sin(time * 0.2) * 15;
+    camera.position.y = 10 + Math.sin(time * 0.4) * 5;
     camera.lookAt(0, 5, 0);
 
     renderer.render(scene, camera);
