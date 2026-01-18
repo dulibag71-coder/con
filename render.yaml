@@ -2,15 +2,11 @@ services:
   - type: web
     name: metaverse-concert-os
     env: docker
-    plan: free # 또는 원하는 플랜으로 변경 가능
-    region: singapore # 한국에서 가까운 지역
+    plan: free
+    region: singapore
     healthCheckPath: /
     envVars:
-      - key: DATABASE_PATH
-        value: /etc/data/database.sqlite
       - key: PORT
         value: 3000
-    disk:
-      name: concert-data
-      mountPath: /etc/data
-      sizeGB: 1
+      # DATABASE_PATH를 지정하지 않으면 서버 폴더 내부의 database.sqlite를 기본으로 사용합니다.
+      # 주의: Render 무료 티어에서는 서버 재시작 시 데이터가 초기화됩니다.
